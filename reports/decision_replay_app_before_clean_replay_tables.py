@@ -1,0 +1,757 @@
+﻿import json
+import subprocess
+from pathlib import Path
+
+import streamlit as st
+
+BASE = Path(__file__).resolve().parents[1]
+
+REPLAY_PATH = BASE / "features" / "latest_decision_replay.json"
+DECISION_STATUS_PATH = BASE / "features" / "latest_decision_data_status.json"
+INTERPRETATION_PATH = BASE / "features" / "latest_decision_replay_interpretation.json"
+
+
+st.set_page_config(
+    page_title="Hermes Decision Replay",
+    layout="wide"
+)
+
+
+def load_json(path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def run_cmd(cmd, timeout=180):
+    try:
+        r = subprocess.run(
+            cmd,
+            cwd=BASE,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        return {
+            "status": "complete" if r.returncode == 0 else "error",
+            "stdout": r.stdout[-1000:],
+            "stderr": r.stderr[-1000:]
+        }
+    except Exception as e:
+        return {
+            "status": "failed",
+            "error": str(e)
+        }
+
+# ============================================================
+
+def render_hermes_power_button():
+    import subprocess as _hermes_power_subprocess
+
+    st.markdown("""
+    <style>
+    /* Top-right-ish Hermes power control */
+    div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) {
+        align-items: center;
+    }
+
+    .hermes-power-note {
+        text-align: right;
+        color: rgba(180,180,180,0.70);
+        font-size: 0.78rem;
+        margin-top: 0.48rem;
+        margin-bottom: 0.20rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    _spacer, _power_col = st.columns([0.88, 0.12])
+
+    with _power_col:
+        if st.button("⏻ Shutdown", key="hermes_top_power_shutdown", type="secondary", use_container_width=True):
+            _stop_script = BASE / "stop_hermes_apps.ps1"
+
+            _hermes_power_subprocess.Popen(
+                [
+                    "powershell.exe",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(_stop_script)
+                ],
+                cwd=str(BASE)
+            )
+
+            st.warning("Shutdown requested. Hermes servers are stopping. Close browser tabs manually.")
+            st.stop()
+
+    st.markdown('<div class="hermes-power-note">Hermes app control</div>', unsafe_allow_html=True)
+
+# ============================================================
+
+def render_hermes_top_power_button():
+    import subprocess as _hermes_shutdown_subprocess
+
+    st.markdown("""
+    <style>
+    /* Fully hide Streamlit sidebar and sidebar collapse control */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+    }
+
+    div[data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
+    /* Slightly reduce top padding so power button sits closer to top-right app area */
+    section.main div.block-container {
+        padding-top: 0.75rem !important;
+    }
+
+    /* Top power button row */
+    .hermes-power-caption {
+        text-align: right;
+        color: rgba(180,180,180,0.72);
+        font-size: 0.78rem;
+        margin-top: 0.48rem;
+        margin-bottom: 0.25rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    _left, _right = st.columns([0.86, 0.14])
+
+    with _right:
+        if st.button("⏻ Shutdown", key="hermes_top_power_shutdown_button", type="secondary", width="stretch"):
+            _stop_script = BASE / "stop_hermes_apps.ps1"
+
+            _hermes_shutdown_subprocess.Popen(
+                [
+                    "powershell.exe",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(_stop_script)
+                ],
+                cwd=str(BASE)
+            )
+
+            st.warning("Shutdown requested. Hermes servers are stopping. Close browser tabs manually.")
+            st.stop()
+
+    st.markdown('<div class="hermes-power-caption">Hermes app control</div>', unsafe_allow_html=True)
+
+# ============================================================
+
+def render_hermes_skinny_power_button():
+    import subprocess as _hermes_shutdown_subprocess
+
+    try:
+        _shutdown_requested = st.query_params.get("hermes_shutdown", None)
+    except Exception:
+        _shutdown_requested = None
+
+    if _shutdown_requested:
+        _stop_script = BASE / "stop_hermes_apps.ps1"
+
+        _hermes_shutdown_subprocess.Popen(
+            [
+                "powershell.exe",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(_stop_script)
+            ],
+            cwd=str(BASE)
+        )
+
+        st.warning("Shutdown requested. Hermes servers are stopping. Close browser tabs manually.")
+        st.stop()
+
+    st.markdown("""
+    <style>
+    /* Hide sidebar completely */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+    }
+
+    div[data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
+    /* Tiny red fixed power button near Deploy */
+    .hermes-skinny-power-button {
+        position: fixed;
+        top: 0.48rem;
+        right: 7.10rem;
+        z-index: 2147483647;
+        width: 1.42rem;
+        height: 1.22rem;
+        border-radius: 999px;
+        background: rgba(185, 28, 28, 0.92);
+        border: 1px solid rgba(248, 113, 113, 0.88);
+        color: rgba(255, 255, 255, 0.98) !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none !important;
+        font-size: 0.78rem;
+        font-weight: 950;
+        line-height: 1;
+        box-shadow: 0 5px 14px rgba(0,0,0,0.35);
+        backdrop-filter: blur(8px);
+    }
+
+    .hermes-skinny-power-button:hover {
+        background: rgba(220, 38, 38, 0.98);
+        border-color: rgba(252, 165, 165, 1.0);
+        transform: translateY(-1px);
+    }
+
+    .hermes-skinny-power-button:active {
+        background: rgba(127, 29, 29, 1.0);
+        transform: translateY(0px);
+    }
+    </style>
+
+    <a class="hermes-skinny-power-button" href="?hermes_shutdown=1" title="Shutdown Hermes Apps">⏻</a>
+    """, unsafe_allow_html=True)
+
+# ============================================================
+
+def render_hermes_inline_power_button():
+    import subprocess as _hermes_shutdown_subprocess
+
+    try:
+        _shutdown_requested = st.query_params.get("hermes_shutdown", None)
+    except Exception:
+        _shutdown_requested = None
+
+    if _shutdown_requested:
+        _stop_script = BASE / "stop_hermes_apps.ps1"
+
+        _hermes_shutdown_subprocess.Popen(
+            [
+                "powershell.exe",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(_stop_script)
+            ],
+            cwd=str(BASE)
+        )
+
+        st.warning("Shutdown requested. Hermes servers are stopping. Close browser tabs manually.")
+        st.stop()
+
+    st.markdown("""
+    <style>
+    /* Hide Streamlit sidebar completely */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+    }
+
+    div[data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
+    /* Top-right normal layout row, not floating */
+    .hermes-inline-power-row {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        margin-top: -0.35rem;
+        margin-bottom: 0.55rem;
+        padding-right: 0.15rem;
+    }
+
+    .hermes-inline-power-button {
+        width: 2.15rem;
+        height: 1.28rem;
+        border-radius: 999px;
+        background: rgba(185, 28, 28, 0.92);
+        border: 1px solid rgba(248, 113, 113, 0.88);
+        color: rgba(255, 255, 255, 0.98) !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none !important;
+        font-size: 0.82rem;
+        font-weight: 950;
+        line-height: 1;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.30);
+    }
+
+    .hermes-inline-power-button:hover {
+        background: rgba(220, 38, 38, 0.98);
+        border-color: rgba(252, 165, 165, 1.0);
+        transform: translateY(-1px);
+    }
+
+    .hermes-inline-power-button:active {
+        background: rgba(127, 29, 29, 1.0);
+        transform: translateY(0px);
+    }
+    </style>
+
+    <div class="hermes-inline-power-row">
+        <a class="hermes-inline-power-button" href="?hermes_shutdown=1" title="Shutdown Hermes apps">⏻</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ============================================================
+
+def render_hermes_app_control_menu():
+    import subprocess as _hermes_shutdown_subprocess
+
+    st.markdown("""
+    <style>
+    /* Hide Streamlit sidebar and top-left sidebar toggle */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+    }
+
+    div[data-testid="collapsedControl"],
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"],
+    button[aria-label="Open sidebar"],
+    button[title="Open sidebar"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    /* Small right-aligned app-control row below Streamlit toolbar */
+    .hermes-app-control-spacer {
+        margin-top: -0.35rem;
+        margin-bottom: 0.35rem;
+    }
+
+    /* Make popover trigger compact */
+    div[data-testid="stPopover"] button {
+        min-height: 1.80rem !important;
+        height: 1.80rem !important;
+        padding: 0.10rem 0.55rem !important;
+        font-size: 0.78rem !important;
+        border-radius: 999px !important;
+        opacity: 0.88;
+    }
+
+    div[data-testid="stPopover"] button:hover {
+        opacity: 1.0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="hermes-app-control-spacer"></div>', unsafe_allow_html=True)
+
+    _left, _right = st.columns([0.88, 0.12])
+
+    with _right:
+        with st.popover("⋮ App", use_container_width=True):
+            st.caption("Hermes app control")
+
+            if st.button("⏻ Shutdown Hermes Apps", key="hermes_menu_shutdown_all", type="secondary", use_container_width=True):
+                _stop_script = BASE / "stop_hermes_apps.ps1"
+
+                _hermes_shutdown_subprocess.Popen(
+                    [
+                        "powershell.exe",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(_stop_script)
+                    ],
+                    cwd=str(BASE)
+                )
+
+                st.warning("Shutdown requested. Hermes servers are stopping. Close browser tabs manually.")
+                st.stop()
+
+# ============================================================
+
+def render_hermes_deploy_aligned_shutdown():
+    import subprocess as _hermes_shutdown_subprocess
+
+    try:
+        _shutdown_requested = st.query_params.get("hermes_shutdown", None)
+    except Exception:
+        _shutdown_requested = None
+
+    if _shutdown_requested:
+        _stop_script = BASE / "stop_hermes_apps.ps1"
+
+        _hermes_shutdown_subprocess.Popen(
+            [
+                "powershell.exe",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(_stop_script)
+            ],
+            cwd=str(BASE)
+        )
+
+        st.warning("Shutdown requested. Hermes servers are stopping. Close browser tabs manually.")
+        st.stop()
+
+    st.markdown("""
+    <style>
+    /* Hide Streamlit sidebar and top-left sidebar toggle */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+    }
+
+    div[data-testid="collapsedControl"],
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"],
+    button[aria-label="Open sidebar"],
+    button[title="Open sidebar"],
+    button[aria-label="Close sidebar"],
+    button[title="Close sidebar"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    /* Normal app-layout row, aligned to right, just under Streamlit toolbar */
+    .hermes-shutdown-row {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        margin-top: -0.65rem;
+        margin-bottom: 0.85rem;
+        padding-right: 0.15rem;
+    }
+
+    .hermes-shutdown-mini {
+        width: 2.05rem;
+        height: 1.22rem;
+        border-radius: 999px;
+        background: rgba(185, 28, 28, 0.92);
+        border: 1px solid rgba(248, 113, 113, 0.88);
+        color: rgba(255, 255, 255, 0.98) !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none !important;
+        font-size: 0.78rem;
+        font-weight: 950;
+        line-height: 1;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.28);
+    }
+
+    .hermes-shutdown-mini:hover {
+        background: rgba(220, 38, 38, 0.98);
+        border-color: rgba(252, 165, 165, 1.0);
+        transform: translateY(-1px);
+    }
+
+    .hermes-shutdown-mini:active {
+        background: rgba(127, 29, 29, 1.0);
+        transform: translateY(0px);
+    }
+    </style>
+
+    <div class="hermes-shutdown-row">
+        <a class="hermes-shutdown-mini" href="?hermes_shutdown=1" title="Shutdown Hermes Apps">⏻</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+
+# ============================================================
+# Hermes Final Right-Edge Power Button
+# ============================================================
+
+def render_hermes_final_power_button():
+    import subprocess as _hermes_shutdown_subprocess
+
+    try:
+        _shutdown_requested = st.query_params.get("hermes_shutdown", None)
+    except Exception:
+        _shutdown_requested = None
+
+    if _shutdown_requested:
+        _stop_script = BASE / "stop_hermes_apps.ps1"
+
+        _hermes_shutdown_subprocess.Popen(
+            [
+                "powershell.exe",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(_stop_script)
+            ],
+            cwd=str(BASE)
+        )
+
+        st.warning("Shutdown requested. Hermes servers are stopping. Close browser tabs manually.")
+        st.stop()
+
+    st.markdown("""
+    <style>
+    /* Hide Streamlit sidebar and top-left sidebar toggle */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+    }
+
+    div[data-testid="collapsedControl"],
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"],
+    button[aria-label="Open sidebar"],
+    button[title="Open sidebar"],
+    button[aria-label="Close sidebar"],
+    button[title="Close sidebar"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    /* Final button: small red circle below Deploy / 3-dot area */
+    .hermes-final-power-button {
+        position: fixed;
+        top: 4.15rem;
+        right: 1.05rem;
+        z-index: 2147483647;
+
+        width: 2.55rem;
+        height: 2.55rem;
+        border-radius: 999px;
+
+        background: rgba(185, 28, 28, 0.94);
+        border: 1px solid rgba(248, 113, 113, 0.95);
+        color: rgba(255,255,255,0.98) !important;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        text-decoration: none !important;
+        font-size: 1.18rem;
+        font-weight: 950;
+        line-height: 1;
+
+        box-shadow: 0 7px 20px rgba(0,0,0,0.34);
+        backdrop-filter: blur(8px);
+    }
+
+    .hermes-final-power-button:hover {
+        background: rgba(220, 38, 38, 0.98);
+        border-color: rgba(252, 165, 165, 1.0);
+        transform: translateY(-1px);
+    }
+
+    .hermes-final-power-button:active {
+        background: rgba(127, 29, 29, 1.0);
+        transform: translateY(0px);
+    }
+    </style>
+
+    <a class="hermes-final-power-button" href="?hermes_shutdown=1" title="Shutdown Hermes Apps">⏻</a>
+    """, unsafe_allow_html=True)
+
+
+render_hermes_final_power_button()
+
+st.title("Hermes Decision Replay")
+st.caption("Replay readiness for manual actions, agent suggestions, thesis records, and portfolio snapshots. Advisory only.")
+
+if st.button("Refresh Decision Data + Replay", width="stretch"):
+    r1 = run_cmd(["py", "tools\\decision_data_engine.py"])
+    r2 = run_cmd(["py", "tools\\decision_replay_engine.py"])
+    r3 = run_cmd(["py", "tools\\decision_replay_interpreter.py"])
+    st.toast(f"Decision data: {r1.get('status')} | Replay: {r2.get('status')} | Interpretation: {r3.get('status')}")
+    st.rerun()
+
+replay = load_json(REPLAY_PATH, {})
+decision = load_json(DECISION_STATUS_PATH, {})
+interpretation_packet = load_json(INTERPRETATION_PATH, {})
+
+summary = replay.get("summary", {})
+counts = replay.get("counts", {})
+
+st.markdown("## Replay Summary")
+
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Replay Status", summary.get("overall_status", "unknown"))
+c2.metric("Manual Ready", summary.get("manual_ready_count", 0))
+c3.metric("Agent Ready", summary.get("agent_ready_count", 0))
+c4.metric("Portfolio Positions", counts.get("portfolio_positions", 0))
+
+st.info(summary.get("read", "Replay engine has not run yet."))
+
+missing_prices = replay.get("tickers_missing_current_price", [])
+
+if missing_prices:
+    st.markdown("### Missing Current Price")
+    for ticker in missing_prices:
+        st.markdown(f"- 🔴 {ticker}")
+else:
+    st.success("No tickers are missing current price.")
+
+
+st.markdown("---")
+st.markdown("## Replay Interpretation")
+
+interpretation = interpretation_packet.get("interpretation", {})
+
+headline = interpretation.get("headline", "Decision replay interpretation has not run yet.")
+severity = interpretation.get("severity", "yellow")
+plain_read = interpretation.get("plain_english_read", "Run the replay interpreter to generate an interpretation.")
+positives = interpretation.get("positives", [])
+blockers = interpretation.get("blockers", [])
+next_actions = interpretation.get("next_actions", [])
+metrics = interpretation.get("metrics", {})
+
+if severity == "green":
+    st.success(headline)
+elif severity == "red":
+    st.error(headline)
+else:
+    st.warning(headline)
+
+st.info(plain_read)
+
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Manual Actions", metrics.get("manual_actions", 0))
+m2.metric("Manual Ready", metrics.get("manual_ready", 0))
+m3.metric("Agent Ready", metrics.get("agent_ready", 0))
+m4.metric("Missing Prices", metrics.get("missing_current_price_count", 0))
+
+left_col, right_col = st.columns(2)
+
+with left_col:
+    st.markdown("### Positives")
+    if positives:
+        for item in positives:
+            st.markdown(f"- ✅ {item}")
+    else:
+        st.caption("No positives yet.")
+
+    st.markdown("### Blockers")
+    if blockers:
+        for item in blockers:
+            st.markdown(f"- 🔴 {item}")
+    else:
+        st.success("No blockers detected.")
+
+with right_col:
+    st.markdown("### Next Actions")
+    if next_actions:
+        for item in next_actions:
+            st.markdown(f"- {item}")
+    else:
+        st.caption("No next actions generated.")
+
+
+st.markdown("---")
+
+tab_manual, tab_agent, tab_thesis, tab_files = st.tabs([
+    "Manual Action Replay",
+    "Agent Suggestion Replay",
+    "Thesis Health",
+    "Files"
+])
+
+with tab_manual:
+    st.markdown("## Manual Action Replay")
+    rows = replay.get("manual_replays", [])
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+    else:
+        st.warning("No manual actions logged yet.")
+
+with tab_agent:
+    st.markdown("## Agent Suggestion Replay")
+    rows = replay.get("agent_replays", [])
+    if rows:
+        st.dataframe(rows, width="stretch", hide_index=True)
+    else:
+        st.warning("No agent suggestions logged yet.")
+
+with tab_thesis:
+    st.markdown("## Latest Thesis By Ticker")
+    thesis = replay.get("latest_thesis_by_ticker", {})
+    if thesis:
+        rows = list(thesis.values())
+        st.dataframe(rows, width="stretch", hide_index=True)
+    else:
+        st.warning("No thesis health records logged yet.")
+
+with tab_files:
+    st.markdown("## Replay Files")
+    files = replay.get("files", {})
+    if files:
+        for key, value in files.items():
+            st.code(f"{key}: {value}")
+    else:
+        st.caption("No replay file metadata available.")
+
+# ============================================================
+
+try:
+    import subprocess as _hermes_shutdown_subprocess
+
+    with st.sidebar:
+        st.markdown("---")
+        
+
+        if st.button("Shutdown Hermes Apps", key="shutdown_hermes_apps_global", type="secondary", use_container_width=True):
+            _stop_script = BASE / "stop_hermes_apps.ps1"
+
+            _hermes_shutdown_subprocess.Popen(
+                [
+                    "powershell.exe",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(_stop_script)
+                ],
+                cwd=str(BASE)
+            )
+
+            st.warning("Shutdown requested. Hermes servers will stop. Close browser tabs manually.")
+            st.stop()
+
+except Exception as _shutdown_error:
+    try:
+        with st.sidebar:
+            st.caption(f"Shutdown control unavailable: {_shutdown_error}")
+    except Exception:
+        pass
+
+
